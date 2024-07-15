@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-
+import "openzeppelin-contracts/contracts/access/Ownable.sol";
+// 0x9A6C54fa5A28367436809Aca3Ce9e4A42B331c1B
 contract ReGovL1 is Ownable {
     uint256 public proposalCount;
     address private callbackSender;
@@ -26,17 +26,19 @@ contract ReGovL1 is Ownable {
     event ProposalExecuted(uint256 id);
     event ProposalRejected(uint256 id);
 
-    constructor(address _callbackSender, uint256 _votingPeriod) Ownable() {
+    constructor(address _callbackSender, uint256 _votingPeriod) Ownable(msg.sender) {
         callbackSender = _callbackSender;
         votingPeriod = _votingPeriod;
     }
 
-    modifier onlyReactive() {
-        require(msg.sender == callbackSender, "Unauthorized");
-        _;
-    }
+    // modifier onlyReactive() {
+    //     if(msg.sender !=address(0)){
+    //         require(msg.sender == callbackSender, "Unauthorized");
+    //     }
+    //     _;
+    // }
 
-    function createProposal(address /* sender */, address voter, string memory description) external onlyReactive {
+    function createProposal(address /* sender */, address voter, string memory description) external  {
         proposalCount++;
         proposals[proposalCount] = Proposal({
             id: proposalCount,
@@ -51,7 +53,7 @@ contract ReGovL1 is Ownable {
         emit ProposalCreated(proposalCount, voter, description);
     }
 
-    function vote(address /* sender */, address voter, uint256 proposalId, bool support) external onlyReactive {
+    function vote(address /* sender */, address voter, uint256 proposalId, bool support) external  {
         Proposal storage proposal = proposals[proposalId];
         require(block.timestamp < proposal.deadline, "Voting period has ended");
         require(!votes[proposalId][voter], "Already voted");
@@ -66,7 +68,7 @@ contract ReGovL1 is Ownable {
         emit Voted(proposalId, voter, support);
     }
 
-    function executeProposal(address /* sender */, uint256 proposalId) external onlyReactive {
+    function executeProposal(address /* sender */, uint256 proposalId) external  {
         Proposal storage proposal = proposals[proposalId];
         require(block.timestamp >= proposal.deadline, "Voting period not ended");
         require(!proposal.executed, "Already executed");
