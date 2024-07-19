@@ -2,11 +2,14 @@
 pragma solidity ^0.8.0;
 
 import "openzeppelin-contracts/contracts/access/Ownable.sol";
-// 0x9A6C54fa5A28367436809Aca3Ce9e4A42B331c1B
+
+
+
 contract ReGovL1 is Ownable {
     uint256 public proposalCount;
-    address private callbackSender;
-    uint256 public votingPeriod;
+    // address private callbackSender;
+    // uint256 public votingPeriod;
+    uint256 public voteThreshold=1;
 
     struct Proposal {
         uint256 id;
@@ -20,57 +23,71 @@ contract ReGovL1 is Ownable {
 
     mapping(uint256 => Proposal) public proposals;
     mapping(uint256 => mapping(address => bool)) public votes;
+    mapping(uint256 => uint256) public proposalDeadlines;
 
     event ProposalCreated(uint256 id, address proposer, string description);
     event Voted(uint256 proposalId, address voter, bool support);
     event ProposalExecuted(uint256 id);
     event ProposalRejected(uint256 id);
+    event ProposalDeadlineReached(uint256 indexed id, uint256 deadline);
+    event ProposalForThresholdReached(uint256 indexed id);
+    event ProposalAgainstThresholdReached(uint256 indexed  id);
 
-    constructor(address _callbackSender, uint256 _votingPeriod) Ownable(msg.sender) {
-        callbackSender = _callbackSender;
-        votingPeriod = _votingPeriod;
+    constructor() Ownable(msg.sender) {
+       
     }
 
-    // modifier onlyReactive() {
-    //     if(msg.sender !=address(0)){
-    //         require(msg.sender == callbackSender, "Unauthorized");
-    //     }
-    //     _;
-    // }
-
-    function createProposal(address /* sender */, address voter, string memory description) external  {
+    function createProposal( string memory description) external {
         proposalCount++;
+        uint256 deadline = block.timestamp + 5 minutes;
         proposals[proposalCount] = Proposal({
             id: proposalCount,
-            proposer: voter,
+            proposer: msg.sender,
             description: description,
             votesFor: 0,
             votesAgainst: 0,
             executed: false,
-            deadline: block.timestamp + votingPeriod
+            deadline: deadline
         });
 
-        emit ProposalCreated(proposalCount, voter, description);
+        proposalDeadlines[proposalCount] = deadline;
+
+        emit ProposalCreated(proposalCount, msg.sender, description);
+        checkProposalDeadlines();
     }
 
-    function vote(address /* sender */, address voter, uint256 proposalId, bool support) external  {
+    function vote(  uint256 proposalId, bool support) external {
+        address voter=msg.sender;
         Proposal storage proposal = proposals[proposalId];
-        require(block.timestamp < proposal.deadline, "Voting period has ended");
+        checkProposalDeadlines();
+        // require(voter != proposal.proposer, "You cannot vote on your own proposal");
+
+        // require(block.timestamp < proposal.deadline, "Voting period has ended");
         require(!votes[proposalId][voter], "Already voted");
 
-        if (support) {
+        if(proposals[proposalId].votesFor >= voteThreshold){
+            emit ProposalForThresholdReached(proposalId);
+        }
+        else if(proposals[proposalId].votesAgainst >= voteThreshold){
+            emit ProposalAgainstThresholdReached(proposalId);
+        }
+        else if (support) {
             proposal.votesFor++;
+            votes[proposalId][voter] = true;
+            emit Voted(proposalId, voter, support);
         } else {
+            votes[proposalId][voter] = true;
+            emit Voted(proposalId, voter, support);
             proposal.votesAgainst++;
         }
 
-        votes[proposalId][voter] = true;
-        emit Voted(proposalId, voter, support);
+
     }
 
-    function executeProposal(address /* sender */, uint256 proposalId) external  {
+    function executeProposal(address /*sender*/ , uint256 proposalId) external {
         Proposal storage proposal = proposals[proposalId];
-        require(block.timestamp >= proposal.deadline, "Voting period not ended");
+        checkProposalDeadlines();
+        // require(block.timestamp >= proposal.deadline, "Voting period not ended");
         require(!proposal.executed, "Already executed");
 
         if (proposal.votesFor > proposal.votesAgainst) {
@@ -78,6 +95,23 @@ contract ReGovL1 is Ownable {
             emit ProposalExecuted(proposalId);
         } else {
             emit ProposalRejected(proposalId);
+        }
+
+    }
+
+    function DeleteProposal(address /*sender*/ ,uint256 proposalId) public{
+        // Proposal storage proposal = proposals[proposalId];
+        // require(msg.sender == proposal.proposer, "Only the proposer can delete the proposal");
+        delete proposals[proposalId];
+        delete proposalDeadlines[proposalId];
+    }
+
+    function checkProposalDeadlines() public {
+        for (uint256 i = 1; i <= proposalCount; i++) {
+            if (block.timestamp > proposalDeadlines[i] && proposalDeadlines[i] != 0) {
+                emit ProposalDeadlineReached(i, proposalDeadlines[i]);
+                proposalDeadlines[i] = 0; // Set to 0 to avoid emitting the event multiple times
+            }
         }
     }
 }

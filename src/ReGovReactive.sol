@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity >=0.8.0;
-// 0x1B8F8E14a370e9f9B7BC47818cf4a88B2a9830b6
+
 
 
 import '../IReactive.sol';
@@ -12,9 +12,10 @@ contract ReGovReactive is IReactive {
 
     uint256 private constant SEPOLIA_CHAIN_ID = 11155111;
 
-    uint256 private constant REQUEST_PROPOSAL_CREATE_TOPIC_0 = 0x10b6d2b6d98ae8d7bf6288a4567e5a2e7a82d5be126c0ca8c028a685ac7dba87;
-    uint256 private constant REQUEST_PROPOSAL_EXECUTE_TOPIC_0 = 0xcfc536199fed6fc9a1800da06eff07bc51565c5b442f83cd2d96344089bb07e4;
-    uint256 private constant REQUEST_VOTE_TOPIC_0 = 0x8131eb889128114273bfedf30bfe5aad1a8f3bbef5d40f786c44000e3361ed0a;
+    uint256 private constant VOTE_FOR_THRESOLD_REACH_TOPIC_0 =0x7edbeb06298438692f5e60c369b3d70cf26194c2263ff97ab5b32cecbddad8a7 ;
+    uint256 private constant VOTE_AGAINST_THRESOLD_REACH_TOPIC_0 = 0xba3d34a559bd7600063768ee32172d8872b43d899ccd8ca2f9e9849e289e9fa2
+;
+    uint256 private constant DEADLINE_REACH_TOPIC_0 =0xecbc3a8bcc8ece0c1c67901dca8b46a78df89c54d4c702fd932f3ad8e1b7241e ;
 
     uint64 private constant CALLBACK_GAS_LIMIT = 1000000;
 
@@ -23,14 +24,14 @@ contract ReGovReactive is IReactive {
     ISubscriptionService private service;
     address private l1;
 
-    constructor(address service_address, address _contract, address _l1) {
+    constructor(address service_address, address _l1) {
         
         service = ISubscriptionService(service_address);
         bytes memory payload1 = abi.encodeWithSignature(
             "subscribe(uint256,address,uint256,uint256,uint256,uint256)",
             SEPOLIA_CHAIN_ID,
-            _contract,
-            REQUEST_PROPOSAL_CREATE_TOPIC_0,
+            _l1,
+            VOTE_FOR_THRESOLD_REACH_TOPIC_0,
             REACTIVE_IGNORE,
             REACTIVE_IGNORE,
             REACTIVE_IGNORE
@@ -42,8 +43,8 @@ contract ReGovReactive is IReactive {
         bytes memory payload2 = abi.encodeWithSignature(
             "subscribe(uint256,address,uint256,uint256,uint256,uint256)",
             SEPOLIA_CHAIN_ID,
-            _contract,
-            REQUEST_PROPOSAL_EXECUTE_TOPIC_0,
+            _l1,
+            VOTE_AGAINST_THRESOLD_REACH_TOPIC_0,
             REACTIVE_IGNORE,
             REACTIVE_IGNORE,
             REACTIVE_IGNORE
@@ -55,8 +56,8 @@ contract ReGovReactive is IReactive {
         bytes memory payload3 = abi.encodeWithSignature(
             "subscribe(uint256,address,uint256,uint256,uint256,uint256)",
             SEPOLIA_CHAIN_ID,
-            _contract,
-            REQUEST_VOTE_TOPIC_0,
+            _l1,
+            DEADLINE_REACH_TOPIC_0,
             REACTIVE_IGNORE,
             REACTIVE_IGNORE,
             REACTIVE_IGNORE
@@ -93,27 +94,24 @@ contract ReGovReactive is IReactive {
         uint256 /* block number */,
         uint256 /* op_code */
     ) external vmOnly {
-        if (topic_0 == REQUEST_VOTE_TOPIC_0) {
-            bool support = topic_3 > 0 ? true : false;
+        if (topic_0 == VOTE_FOR_THRESOLD_REACH_TOPIC_0) {
+           
             bytes memory payload = abi.encodeWithSignature(
-                "vote(address,address,uint256,bool)",
+                "executeProposal(address,uint256)",
                 address(0),
-                address(uint160(topic_1)),
-                topic_2,
-                support
+                topic_1
             );
             emit Callback(chain_id, l1, CALLBACK_GAS_LIMIT, payload);
-        } else if (topic_0 == REQUEST_PROPOSAL_CREATE_TOPIC_0) {
+        } else if (topic_0 == VOTE_AGAINST_THRESOLD_REACH_TOPIC_0) {
             
             
             bytes memory payload = abi.encodeWithSignature(
-                "createProposal(address,address,string)",
+                "DeleteProposal(address,uint256)",
                 address(0),
-                address(uint160(topic_1)),
-                data
+                topic_1
             );
             emit Callback(chain_id, l1, CALLBACK_GAS_LIMIT, payload);
-        } else if (topic_0 == REQUEST_PROPOSAL_EXECUTE_TOPIC_0) {
+        } else if (topic_0 == DEADLINE_REACH_TOPIC_0) {
             bytes memory payload = abi.encodeWithSignature(
                 "executeProposal(address,uint256)",
                 address(0),
